@@ -355,7 +355,6 @@ Return only the Cypher query."""
             state["final_answer"] = (
                 f"Sorry, I had trouble with that question: {state['error']}"
             )
-        # === History append (error path) ===
             record = {
                 "question": state.get("user_question"),
                 "type": state.get("question_type"),
@@ -371,7 +370,6 @@ Return only the Cypher query."""
                 hist = hist[-10:]
             self._session_history[sid] = hist
             state["history"] = hist
-            # === End history append ===
             return state
 
         question_type = state.get("question_type")
@@ -386,7 +384,6 @@ Return only the Cypher query."""
         Provide a clear, informative answer about biomedical concepts.""",
                 max_tokens=300,  # Allow more tokens for explanatory content
             )
-            # === History append (general_knowledge path) ===
             record = {
                 "question": state.get("user_question"),
                 "type": state.get("question_type"),
@@ -402,7 +399,6 @@ Return only the Cypher query."""
                 hist = hist[-10:]
             self._session_history[sid] = hist
             state["history"] = hist
-            # === End history append ===
             return state
 
 
@@ -413,7 +409,6 @@ Return only the Cypher query."""
                 "I didn't find any information for that question. Try asking about "
                 "genes, diseases, or drugs in our database."
             )
-            # === History append (no-results path) ===
             record = {
                 "question": state.get("user_question"),
                 "type": state.get("question_type"),
@@ -429,7 +424,6 @@ Return only the Cypher query."""
                 hist = hist[-10:]
             self._session_history[sid] = hist
             state["history"] = hist
-            # === End history append ===
             return state
 
 
@@ -446,7 +440,6 @@ Return only the Cypher query."""
             # responses
         )
 
-        # === Inserted history append block ===
         record = {
             "question": state.get("user_question"),
             "type": state.get("question_type"),
@@ -463,7 +456,6 @@ Return only the Cypher query."""
             hist = hist[-10:]
         self._session_history[sid] = hist
         state["history"] = hist
-        # === End inserted block ===
 
         return state
 
