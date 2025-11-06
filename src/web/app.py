@@ -22,6 +22,9 @@ import os
 import sys
 from pathlib import Path
 
+from uuid import uuid4
+
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -37,6 +40,8 @@ from agents.workflow_agent import WorkflowAgent  # noqa: E402
 # Load environment variables and configure page
 load_dotenv()
 st.set_page_config(page_title="Helix Navigator", page_icon="🔬", layout="wide")
+# Jack's addition: Session state for user sessions
+st.session_state.setdefault("session_id", str(uuid4()))
 
 # Constants
 EXAMPLE_QUESTIONS = [
@@ -349,7 +354,9 @@ def main_interface(workflow_agent, graph_interface):
         if st.button("Run Workflow Agent", type="primary"):
             if question_input:
                 with st.spinner("Running agent workflow..."):
-                    result = workflow_agent.answer_question(question_input)
+                    result = workflow_agent.answer_question(
+                    question_input, session_id=st.session_state["session_id"]
+                    )
 
                 st.success("Workflow Complete!")
 
@@ -369,6 +376,16 @@ def main_interface(workflow_agent, graph_interface):
 
                 st.subheader("Final Answer")
                 st.info(result["answer"])
+
+                if result.get("history"):
+                    with st.expander("History (last 10)"):
+                        for i, item in enumerate(reversed(result["history"]), 1):
+                            st.markdown(
+                                f"{i}. Q: `{item.get('question','')}` · "
+                                f"type: `{item.get('type','')}` · "
+                                f"entities: {item.get('entities', [])} · "
+                                f"results: {item.get('results_count', 0)}"
+                            )
 
                 # Show raw results
                 if result.get("raw_results"):
