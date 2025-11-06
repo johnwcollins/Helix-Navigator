@@ -1,101 +1,139 @@
-# Helix Navigator
+`````markdown
+# Helix Navigator – Quarter 1 Replication Project
 
-**Learn LangGraph and Knowledge Graphs through Biomedical AI**
+**Biomedical AI through LangGraph and Knowledge Graph Workflows**
 
-An interactive educational project that teaches modern AI development through hands-on biomedical applications. Build AI agents that answer complex questions about genes, proteins, diseases, and drugs using graph databases and multi-step AI workflows.
+This repository replicates and extends the **Helix Navigator** framework as part of my UCSD DSC 180A Quarter 1 Project.  
+The original system was developed by **Abed El Husseini** and collaborators in the [hdsi_replication_proj_2025](https://github.com/aelhusseini/hdsi_replication_proj_2025) repository.  
+This version introduces **session-level memory** and related workflow enhancements for conversation persistence and evaluation.
 
-*Navigate: [Getting Started](docs/getting-started.md) | [Foundations Guide](docs/foundations-and-background.md) | [Reference](docs/reference.md) | [Technical Guide](docs/technical-guide.md)*
+---
 
+## Project Purpose
 
-## What You'll Learn
+The project explores how language-model reasoning can integrate with structured biomedical knowledge represented in graph form.  
+It reproduces the Helix Navigator baseline and extends it with conversation continuity and reproducibility features while leaving all Neo4j schema and data logic untouched.
 
-- **Knowledge Graphs**: Represent domain knowledge as nodes and relationships
-- **LangGraph**: Build multi-step AI workflows with state management  
-- **Cypher Queries**: Query graph databases effectively
-- **AI Integration**: Combine language models with structured knowledge
-- **Biomedical Applications**: Apply AI to drug discovery and personalized medicine
+---
+
+## Implemented Enhancement – Session-Level Memory
+
+This version introduced **session-level memory** to the Helix Navigator workflow.
+
+### Core Changes
+
+1. **State model expanded**  
+   Added `session_id` and `history` fields to `WorkflowState` so each run can persist context and prior turns.
+
+2. **History recording**  
+   In `format_answer`, appended a compact record of each completed interaction — question, type, entities, Cypher query, result count, error, timestamp — capped at ≈ 10 entries.
+
+3. **WorkflowAgent interface**  
+   Updated `answer_question` to accept a `session_id`, reuse existing `history`, and return the updated record list with every response.
+
+4. **Streamlit integration**  
+   Stored a persistent `session_id` in `st.session_state`; passed it into `agent.answer_question`; added a collapsible **History** panel in the UI showing recent queries and answers.
+
+5. **Tests**  
+   Added coverage verifying:  
+   • history list exists and rolls over correctly  
+   • new entries reflect the latest question  
+   • session reuse preserves context across runs  
+
+No database schema or Neo4j logic changed; all persistence remains in memory through Streamlit session state.
+
+---
 
 ## Quick Start
 
-1. **New to these concepts?** Read the [Foundations Guide](docs/foundations-and-background.md)
-2. **Setup**: Follow [Getting Started](docs/getting-started.md) for installation
-3. **Learn**: Use the interactive Streamlit web interface
-4. **Practice**: Work through the exercises in the web app
+**Requirements:** Python 3.10+, Neo4j Desktop, PDM
+
+```bash
+git clone https://github.com/johnwcollins/helix-navigator-replication.git
+cd helix-navigator-replication
+pdm install
+cp .env.example .env
+pdm run load-data
+pdm run app
+````
+
+To validate reproducibility:
+
+```bash
+pdm run test
+pdm run lint
+pdm run format
+```
+
+---
+
+## Repository Structure
+
+```
+├── data/                     # Biomedical CSV datasets
+├── docs/                     # Foundations, setup, reference, technical guides
+├── langgraph-studio/         # Visual debugging assets
+├── scripts/                  # Data loaders and quickstart scripts
+├── src/
+│   ├── agents/
+│   │   ├── graph_interface.py
+│   │   └── workflow_agent.py     # updated with session memory logic
+│   └── web/
+│       └── app.py                # updated with history panel + session_id
+└── tests/                    # Expanded unit tests for history + context
+```
+
+---
 
 ## Technology Stack
 
-- **LangGraph**: AI workflow orchestration
-- **Neo4j**: Graph database
-- **Anthropic Claude**: Language model
-- **Streamlit**: Interactive web interface
-- **LangGraph Studio**: Visual debugging
+* **LangGraph** – Workflow orchestration
+* **Neo4j** – Biomedical knowledge graph
+* **Anthropic Claude** – Language reasoning
+* **Streamlit** – Interactive web UI
+* **LangGraph Studio** – Workflow visualization
 
-## Installation
+---
 
-**Quick Setup**: Python 3.10+, Neo4j, PDM
+## Reproducibility Guide
 
-```bash
-# Install dependencies
-pdm install
+1. **Data Access**
+   Launch Neo4j Desktop and load the CSVs under `data/`.
 
-# Setup environment
-cp .env.example .env
-# Edit .env with your API keys
+2. **Dependencies**
+   Managed through `pdm.lock` for deterministic builds.
 
-# Load data and start
-pdm run load-data
-pdm run app
+3. **Execution**
+
+   ```bash
+   pdm run load-data
+   pdm run app
+   ```
+
+---
+
+## Planned Additions
+
+| Feature                | Description                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| **Evaluation Metrics** | Add node- and system-level scoring for workflow accuracy and retrieval quality. |
+| **Workflow Logging**   | Structured JSON traces for agentic reasoning steps.                             |
+
+---
+
+## Example Queries
+
+* “Which approved drugs target proteins associated with Alzheimer’s disease?”
+* “What genes encode proteins linked to cardiovascular disorders?”
+* “Which drugs show strong efficacy across related disease classes?”
+
+---
+
+## Attribution
+
+Original Helix Navigator materials and architecture were created by **Abed El Husseini** in the
+[hdsi_replication_proj_2025](https://github.com/aelhusseini/hdsi_replication_proj_2025) repository.
+This repository represents my independent **replication and extension** for the UCSD DSC 180A Quarter 1 Project Checkpoint.
+
 ```
-
-## Project Structure
-
 ```
-├── src/agents/              # AI agent implementations
-├── src/web/app.py          # Interactive Streamlit interface
-├── docs/                   # Documentation and tutorials
-├── data/                   # Biomedical datasets
-├── scripts/                # Data loading utilities
-└── tests/                  # Test suite
-```
-
-**Key Files**:
-- `src/agents/workflow_agent.py` - Main LangGraph agent
-- `src/web/app.py` - Interactive Streamlit interface
-- `docs/` - Complete documentation
-
-## Running the Application
-
-### Basic Usage
-```bash
-pdm run load-data         # Load biomedical data
-pdm run app              # Start web interface
-```
-
-### Visual Debugging
-```bash
-pdm run langgraph    # Start LangGraph Studio
-```
-
-### Development
-```bash
-pdm run test            # Run tests (14 tests)
-pdm run format          # Format code
-pdm run lint            # Check quality
-```
-
-**Full commands**: See [Reference Guide](docs/reference.md)
-
-## AI Agent
-
-**WorkflowAgent** - LangGraph implementation with transparent processing for learning core LangGraph concepts through biomedical applications
-
-## Example Questions
-
-- **"Which drugs have high efficacy for treating diseases?"**
-- **"Which approved drugs treat cardiovascular diseases?"**
-- **"Which genes encode proteins that are biomarkers for diseases?"**
-- **"What drugs target proteins with high confidence disease associations?"**
-- **"Which approved drugs target specific proteins?"**
-- **"Which genes are linked to multiple disease categories?"**
-- **"What proteins have causal associations with diseases?"** 
-
