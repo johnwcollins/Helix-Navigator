@@ -2,9 +2,8 @@
 
 **Biomedical AI via LangGraph Workflows, Knowledge Graphs, and Conversational Memory**
 
-This repository replicates and extends the **Helix Navigator** framework originally developed by **Abed El Husseini** and collaborators for the UCSD Halıcıoğlu Data Science Institute.
-
-The goal of this project is to *accurately reproduce* the original system and *extend it* with a new **session-level memory mechanism** that enables multi-turn conversational reasoning over a biomedical Neo4j knowledge graph.
+This repository replicates and extends the **Helix Navigator** framework originally developed by **Abed El Husseini**.
+The goal of this project is to *extend* the original system with a new **session-level memory mechanism** that enables multi-turn conversational reasoning over a biomedical Neo4j knowledge graph.
 
 This work was completed for **UCSD DSC 180A – Quarter 1 Replication Project**.
 
@@ -446,13 +445,11 @@ pdm run format
 This project is a **replication and extension** of the original **Helix Navigator** created by:
 
 **Abed El Husseini**
-Halıcıoğlu Data Science Institute, UC San Diego
 
 Original repository:
 [https://github.com/aelhusseini/hdsi_replication_proj_2025](https://github.com/aelhusseini/hdsi_replication_proj_2025)
 
 All schema, data, and baseline design originate from the original work.
-All memory architecture, workflow enhancements, and evaluation were developed independently for DSC 180A.
 
 ---
 
