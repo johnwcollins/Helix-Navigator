@@ -26,6 +26,10 @@ class WorkflowState(TypedDict):
     final_answer: Optional[str]
     error: Optional[str]
 
+    # Jack's additional fields for session management
+    session_id: Optional[str]
+    history: Optional[List[Dict[str, Any]]]
+
 
 class WorkflowAgent:
     """LangGraph workflow agent for biomedical knowledge graphs."""
@@ -46,6 +50,9 @@ class WorkflowAgent:
         self.schema = self.graph_db.get_schema_info()
         self.property_values = self._get_key_property_values()
         self.workflow = self._create_workflow()
+        
+        # Jack's addition for session management
+        self._session_history: Dict[str, List[Dict[str, Any]]] = {}
 
     def _get_key_property_values(self) -> Dict[str, List[Any]]:
         """Get property values dynamically from all nodes and relationships.
@@ -348,49 +355,114 @@ Return only the Cypher query."""
             state["final_answer"] = (
                 f"Sorry, I had trouble with that question: {state['error']}"
             )
+            record = {
+                "question": state.get("user_question"),
+                "type": state.get("question_type"),
+                "entities": (state.get("entities") or [])[:8],
+                "cypher": (state.get("cypher_query")[:500] if state.get("cypher_query") else None),
+                "results_count": len(state.get("results") or []),
+                "error": state.get("error"),
+            }
+            sid = state.get("session_id") or "default"
+            hist = self._session_history.get(sid, [])
+            hist.append(record)
+            if len(hist) > 10:
+                hist = hist[-10:]
+            self._session_history[sid] = hist
+            state["history"] = hist
             return state
 
         question_type = state.get("question_type")
 
         # General knowledge questions use LLM knowledge instead of database results
         if question_type == "general_knowledge":
-            # Generate answer from LLM's training knowledge rather than database lookup
             state["final_answer"] = self._get_llm_response(
                 f"""Answer this general biomedical question using your knowledge:
 
-Question: {state['user_question']}
+        Question: {state['user_question']}
 
-Provide a clear, informative answer about biomedical concepts.""",
+        Provide a clear, informative answer about biomedical concepts.""",
                 max_tokens=300,  # Allow more tokens for explanatory content
             )
+            record = {
+                "question": state.get("user_question"),
+                "type": state.get("question_type"),
+                "entities": (state.get("entities") or [])[:8],
+                "cypher": (state.get("cypher_query")[:500] if state.get("cypher_query") else None),
+                "results_count": len(state.get("results") or []),
+                "error": state.get("error"),
+            }
+            sid = state.get("session_id") or "default"
+            hist = self._session_history.get(sid, [])
+            hist.append(record)
+            if len(hist) > 10:
+                hist = hist[-10:]
+            self._session_history[sid] = hist
+            state["history"] = hist
             return state
+
 
         # Handle database-based answers using query results
         results = state.get("results", [])
         if not results:
-            # No results found - provide helpful guidance for next steps
             state["final_answer"] = (
                 "I didn't find any information for that question. Try asking about "
                 "genes, diseases, or drugs in our database."
             )
+            record = {
+                "question": state.get("user_question"),
+                "type": state.get("question_type"),
+                "entities": (state.get("entities") or [])[:8],
+                "cypher": (state.get("cypher_query")[:500] if state.get("cypher_query") else None),
+                "results_count": len(state.get("results") or []),
+                "error": state.get("error"),
+            }
+            sid = state.get("session_id") or "default"
+            hist = self._session_history.get(sid, [])
+            hist.append(record)
+            if len(hist) > 10:
+                hist = hist[-10:]
+            self._session_history[sid] = hist
+            state["history"] = hist
             return state
+
 
         # Convert raw database results into natural language using LLM
         state["final_answer"] = self._get_llm_response(
             f"""Convert these database results into a clear answer:
 
-Question: {state['user_question']}
-Results: {json.dumps(results[:5], indent=2)}
-Total found: {len(results)}
+    Question: {state['user_question']}
+    Results: {json.dumps(results[:5], indent=2)}
+    Total found: {len(results)}
 
-Make it concise and informative.""",
+    Make it concise and informative.""",
             max_tokens=250,  # Balanced token limit for informative but concise
             # responses
         )
+
+        record = {
+            "question": state.get("user_question"),
+            "type": state.get("question_type"),
+            "entities": (state.get("entities") or [])[:8],
+            "cypher": (state.get("cypher_query")[:500] if state.get("cypher_query") else None),
+            "results_count": len(state.get("results") or []),
+            "error": state.get("error"),
+        }
+
+        sid = state.get("session_id") or "default"
+        hist = self._session_history.get(sid, [])
+        hist.append(record)
+        if len(hist) > 10:
+            hist = hist[-10:]
+        self._session_history[sid] = hist
+        state["history"] = hist
+
         return state
 
-    def answer_question(self, question: str) -> Dict[str, Any]:
-        """Answer a biomedical question using the LangGraph workflow."""
+
+    def answer_question(self, question: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+        sid = session_id or "default"
+        prior = self._session_history.get(sid, [])
 
         initial_state = WorkflowState(
             user_question=question,
@@ -400,6 +472,8 @@ Make it concise and informative.""",
             results=None,
             final_answer=None,
             error=None,
+            session_id=sid,
+            history=prior[-10:],  # seed with last turns
         )
 
         final_state = self.workflow.invoke(initial_state)
@@ -412,7 +486,9 @@ Make it concise and informative.""",
             "results_count": len(final_state.get("results", [])),
             "raw_results": final_state.get("results", [])[:3],
             "error": final_state.get("error"),
+            "history": final_state.get("history", []),  # expose for UI/tests
         }
+
 
 
 def create_workflow_graph() -> Any:
