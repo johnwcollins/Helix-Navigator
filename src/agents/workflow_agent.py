@@ -54,6 +54,48 @@ class WorkflowAgent:
         # Jack's addition for session management
         self._session_history: Dict[str, List[Dict[str, Any]]] = {}
 
+    # J Work Flow agent Addition
+
+
+
+    def _build_memory_context(self, history: Optional[List[Dict[str, Any]]]) -> str:
+        """Create a short natural-language summary of recent turns for use in prompts."""
+        if not history:
+            return ""
+
+        # Use the most recent turn
+        last = history[-1]
+
+        q = last.get("question") or ""
+        qtype = last.get("type") or "unknown_type"
+        entities = last.get("entities") or []
+        results_count = last.get("results_count", 0)
+
+        # Keep it compact – enough for pronoun resolution
+        context = (
+            f"Previous turn:\n"
+            f"- Question type: {qtype}\n"
+            f"- Question: {q}\n"
+            f"- Entities: {entities}\n"
+            f"- Results count: {results_count}\n"
+        )
+
+        return context
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def _get_key_property_values(self) -> Dict[str, List[Any]]:
         """Get property values dynamically from all nodes and relationships.
 
@@ -172,8 +214,25 @@ Respond with just the type."""
         to handle nuanced questions that don't fit simple keyword patterns.
         """
         try:
-            # Build classification prompt with available question types
-            prompt = self._build_classification_prompt(state["user_question"])
+            # Build base classification prompt for the current question
+            base_prompt = self._build_classification_prompt(state["user_question"])
+
+            # NEW: incorporate recent conversation history (if any)
+            history = state.get("history") or []
+            memory_context = self._build_memory_context(history)
+
+            if memory_context:
+                prompt = (
+                    "You are classifying a biomedical question within an ongoing conversation.\n"
+                    "Use the context below only to help interpret pronouns or references "
+                    "like 'those diseases' or 'the first answer', but always classify the "
+                    "current question itself.\n\n"
+                    f"{memory_context}\n\n"
+                    f"{base_prompt}"
+                )
+            else:
+                prompt = base_prompt
+
             # Use minimal tokens since we only need a single classification word
             state["question_type"] = self._get_llm_response(prompt, max_tokens=20)
         except Exception as e:
@@ -183,6 +242,7 @@ Respond with just the type."""
             # malformed inputs
             state["question_type"] = "general_knowledge"
         return state
+
 
     def extract_entities(self, state: WorkflowState) -> WorkflowState:
         """Extract biomedical entities from the question.
@@ -294,20 +354,39 @@ Node properties: {self.schema['node_properties']}
 Available property values:
 {chr(10).join(property_details) if property_details else "- No values available"}
 Use WHERE property IN [value1, value2] for filtering."""
-        prompt = f"""Create a Cypher query for this biomedical question:
 
-Question: {state['user_question']}
-Type: {question_type}
+        # NEW: incorporate recent conversation history (if any)
+        history = state.get("history") or []
+        memory_context = self._build_memory_context(history)
+
+        prompt = f"""Create a Cypher query for this biomedical question.
+
+If the current question refers to previous answers (for example, using phrases
+like "the first answer", "those diseases", or "those drugs"), use the
+conversation context below to resolve what those references point to.
+
+Conversation context:
+{memory_context if memory_context else "No prior relevant context."}
+
+Current question: {state['user_question']}
+Question type: {question_type}
+
 Schema:
 Nodes: {', '.join(self.schema['node_labels'])}
 Relations: {', '.join(self.schema['relationship_types'])}
+
 {property_info}
 {relationship_guide}
-Entities: {state.get('entities', [])}
 
-Use MATCH, WHERE with CONTAINS for filtering, RETURN, LIMIT 10.
-IMPORTANT: Use property names from schema above and IN filtering for property values.
-Return only the Cypher query."""
+Entities detected in the current question: {state.get('entities', [])}
+
+Write a SINGLE Cypher query that answers ONLY the current question.
+Use MATCH, WHERE with CONTAINS for filtering, RETURN, and LIMIT 10.
+IMPORTANT:
+- Use only property names and relationship types from the schema above.
+- Use IN [value1, value2] when filtering over discrete property values.
+Return only the Cypher query, with no explanation or commentary."""
+
 
         cypher_query = self._get_llm_response(prompt, max_tokens=150)
 
